@@ -57,6 +57,14 @@
           <input type="number" id="minTextLength" min="1" max="30" step="1" />
         </label>
         <label class="field">
+          <span>重复内容检测</span>
+          <select id="dupMode">
+            <option value="safe">保守：同页相同内容 ≥4 条才折叠超出的（推荐）</option>
+            <option value="strict">严格：≥3 条即整组折叠（含已显示的那几条）</option>
+            <option value="off">关闭（不做任何重复判断）</option>
+          </select>
+        </label>
+        <label class="field">
           <span>角标位置</span>
           <select id="badgePosition">
             <option value="bottom-right">右下角</option>
@@ -132,6 +140,10 @@
       <details>
         <summary>查看内置垃圾广告关键词</summary>
         <p id="builtin-spam" class="words"></p>
+      </details>
+      <details>
+        <summary>查看低置信推广信号（单条不会触发过滤，需多条叠加）</summary>
+        <p id="builtin-hints" class="words"></p>
       </details>
       <details>
         <summary>查看内置灌水 / 无效信息关键词</summary>

@@ -39,6 +39,7 @@
     showBadge: true,          // 页面右下角统计角标
     badgePosition: 'bottom-right',
     minTextLength: 2,         // 短于该长度不参与关键词过滤（防误伤，“沙发”等 2 字灌水词要能覆盖）
+    dupMode: 'safe',          // 重复内容检测：off=关闭 | safe=保守(4条起，只折叠超出的) | strict=严格(3条起，整组回溯折叠)
     blockThirdPartyAds: false,// 是否启用 DNR 广告域名拦截规则集
     whitelist: [],            // 站点白名单（域名或子域）
     blockedDomains: [],       // 用户自定义拦截域名
@@ -77,7 +78,6 @@
     '情趣', '性感女主播', '美女主播', '私密直播', '成人app', '成人版', '解锁姿势', '老司机资源',
     // 擦边引流僵尸号常用话术（注意：不用裸的“骚”，否则会误伤“骚扰/骚乱/离骚”）
     '发骚', '骚货', '骚逼', '骚b', '骚女', '骚照', '骚视频', '我骚', '比我骚', '没我骚',
-    '玩的开了吧',
     '磁力链接', '种子下载', '无圣光', '无修版', '抢版', '里世界',
     'nsfw', 'adult video', 'adult chat', 'sex chat', 'sexcam', 'sexting', 'sexy girls',
     'hot girls', 'cam2cam', 'hookup', 'sugar baby', 'sugar daddy', 'only fan', 'leaked nudes'
@@ -93,8 +93,10 @@
     '内部渠道', '一手货源', '厂家直销', '招代理', '代理加盟', '微商', '博彩', '赌场', '真人荷官',
     '时时彩', '六合彩', '北京赛车', 'pk10', '澳门银河', '太阳城', '威尼斯人', '在线赌', '棋牌室',
     '薅羊毛', '羊毛党', '返利机器人', '优惠券群', '0元购', '免费送', '免费试用', '点赞返现',
-    // 引流黑话（“福不黑”= 福利不黑的谐音变体，正常文本不会出现）
-    '福不黑', '福利不黑', '资源不黑',
+    // 引流黑话：“福不黑”是“福利不黑”的谐音变体，本身不是正常词，误伤风险极低。
+    // 注意：不能用“福利不黑 / 资源不黑”做完整匹配，它们会撞上正常说法
+    // （“员工福利不黑心”“资源不黑不吹”），这类只保留为弱信号见 SPAM_WEAK。
+    '福不黑',
     '推荐股票', '股票群', '带单', '喊单', '区块链搬砖', '虚拟币带单', '炒币群', '挖矿机',
     'viagra', 'cialis', 'levitra', 'casino bonus', 'online casino', 'sports betting', 'betting site',
     'buy followers', 'buy cheap meds', 'work from home and earn', 'make money fast', 'double your bitcoin',
@@ -104,10 +106,17 @@
   // 软广 / 引流（低权重）
   const SPAM_WEAK = [
     '广告', '推广', '赞助商', '商务合作', '推广位', '软文', '带货', '直播间', '秒杀', '清仓', '甩卖',
-    '限时特价', '内部价', '扫码', '下载app', '打开app', '立即下载', '点击下载', '点击查看详情',
+    '限时特价', '内部价', '下载app', '打开app', '立即下载', '点击下载', '点击查看详情',
     '更多精彩内容', '更多福利', '戳这里', '点这里', '看这里', '往下看', '评论区见',
-    '主页有惊喜', '主页有福利', '看我主页', '进我主页',
+    // 注：“看我主页 / 进我主页 / 主页有惊喜”这类自我推广语正常博主也在用，
+    // 单条命中不足以判定，故降级为 weight 2 的叠加信号（见 SPAM_HINTS）。
     'sponsored', 'promoted', 'advertisement', 'affiliate link', 'download our app', 'install now'
+  ];
+
+  // 语境依赖的低置信信号（weight 2）：单独出现不触发，需与其他信号叠加
+  const SPAM_HINTS = [
+    '看我主页', '进我主页', '主页有惊喜', '主页有福利', '来我主页', '主页置顶',
+    '扫码', '扫一扫', '加个关注', '点个关注', '私信', '私聊'
   ];
 
   // 无效 / 灌水信息
@@ -233,6 +242,8 @@
       ? makeKeywordRules(SPAM_STRONG.concat(cfg.customSpamKeywords), 10, '垃圾广告')
       : [];
     const spamWeak = cfg.filterSpam ? makeKeywordRules(SPAM_WEAK, 3, '推广信息') : [];
+    // 低置信信号：weight 2，最多累计 3 条（最高 6 分）——单条绝不会触发过滤
+    const spamHints = cfg.filterSpam ? makeKeywordRules(SPAM_HINTS, 2, '低置信推广信号') : [];
     const junkWeak = cfg.filterJunk ? makeKeywordRules(JUNK_WEAK, 3, '灌水信息') : [];
     const contactRules = (cfg.filterSpam || cfg.filterPorn)
       ? CONTACT_PATTERNS.map((p) => ({ re: p.re, weight: p.weight, label: p.label }))
@@ -287,6 +298,7 @@
       hitKeyword(pornWeak, 'porn', 2);
       hitKeyword(spamStrong, 'spam');
       hitKeyword(spamWeak, 'spam', 2);
+      hitKeyword(spamHints, 'spam', 3);
       hitKeyword(junkWeak, 'junk', 2);
 
       for (const rule of contactRules) {
@@ -448,7 +460,7 @@
     DEFAULT_SETTINGS,
     DEFAULT_BLOCKED_DOMAINS,
     KEYWORDS: {
-      PORN_STRONG, PORN_WEAK, SPAM_STRONG, SPAM_WEAK, JUNK_WEAK
+      PORN_STRONG, PORN_WEAK, SPAM_STRONG, SPAM_WEAK, SPAM_HINTS, JUNK_WEAK
     },
     CONTACT_PATTERNS,
     normalizeText,

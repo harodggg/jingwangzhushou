@@ -21,7 +21,8 @@
   const MAX_IMAGE_BUDGET = 120;    // 单个页面分析的图片数量上限
   const IMAGE_MIN_SIZE = 110;      // 小于该边长的图片视为图标/头像，不分析
   const DUP_MIN_LEN = 8;           // 参与“重复刷屏”判定的最短文本
-  const DUP_THRESHOLD = 3;         // 相同文本出现次数阈值（僵尸号刷屏通常 3 条起）
+  const DUP_SAFE_THRESHOLD = 4;    // 保守模式阈值（默认）：只折叠超出的条目
+  const DUP_THRESHOLD = 3;         // 严格模式阈值：整组回溯折叠
   const DUP_MAX_GROUPS = 3000;     // 去重分组上限，防止无限滚动页面内存膨胀
 
   const state = {
@@ -284,11 +285,18 @@
    * 重复刷屏 / 僵尸号群发检测。
    * 关键点：
    *  1. 指纹用 Engine.dupKey —— 表情符号被剥离，所以“同一句话只换表情”仍算同一条；
-   *  2. 达到阈值后**回溯隐藏同组已出现的所有条目**，否则最先刷出来的几条会漏掉；
+   *  2. 阈值与是否回溯整组由设置 dupMode 决定：
+   *       safe（默认，保守）—— 4 条起，只折叠超出的那几条，不动前面正常的
+   *       strict（严格）    —— 3 条起，并把该组已出现的条目一并回溯折叠
+   *       off              —— 完全关闭
+   *     默认保守是因为“同一段文字在一页里出现 2~3 次”在正常页面上很常见
+   *     （列表项、价格标签、被多处引用的标题），激进回溯会误伤正常内容。
    *  3. 内联表情在 Twitter/X 上是 <img>，因此不能因为块里有 img 就跳过；
    *     只有真正的内容图（≥100px）或视频才跳过。
    */
   function detectDuplicate(el, raw) {
+    const mode = state.settings.dupMode || 'safe';
+    if (mode === 'off') return;
     if (raw.length < DUP_MIN_LEN || raw.length > 160) return;
     if (hasHeavyMedia(el)) return;
     if (el.closest('nav, header, footer, aside')) return;
@@ -304,12 +312,16 @@
     group.count++;
     group.elements.push(el);
 
-    if (group.count < DUP_THRESHOLD) return;
-    for (const target of group.elements) {
+    const threshold = mode === 'strict' ? DUP_THRESHOLD : DUP_SAFE_THRESHOLD;
+    if (group.count < threshold) return;
+
+    // 保守模式只处理当前这一条；严格模式回溯整组
+    const targets = mode === 'strict' ? group.elements : [el];
+    for (const target of targets) {
       if (!target.isConnected) continue;
       if (state.userRevealed.has(target)) continue;
       if (target.classList.contains('cf-hidden')) continue;
-      hideBlock(target, '重复刷屏内容（同组 ' + group.count + ' 条）', 'junk');
+      hideBlock(target, '重复刷屏内容（本页相同内容 ' + group.count + ' 条）', 'junk');
     }
   }
 

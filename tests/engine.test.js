@@ -191,6 +191,26 @@ test('不得因为“骚”“放得开”等字误伤正常表达', () => {
   }
 });
 
+test('谐音黑话不得撞上正常说法（误伤回归）', () => {
+  const safe = [
+    '这些资源不黑不吹，确实好用',
+    '公司员工福利不黑心，按时足额发放',
+    '他这人玩的开了吧，天天出去浪'
+  ];
+  for (const text of safe) {
+    assert.equal(scan(text).action, 'pass', '不应拦截：' + text);
+  }
+});
+
+test('单条低置信推广信号不足以触发过滤', () => {
+  // “看我主页 / 扫码”这类正常博主和商家也在用，必须靠其他信号叠加
+  assert.equal(scan('看我主页有更多教程').action, 'pass');
+  assert.equal(scan('扫码支付更方便').action, 'pass');
+  assert.equal(scan('主页有惊喜，欢迎来玩').action, 'pass');
+  // 叠加多个低置信信号后才模糊
+  assert.notEqual(scan('进我主页点个关注呗').action, 'pass');
+});
+
 test('重复指纹忽略表情符号，但保留正文差异', () => {
   assert.equal(
     Engine.dupKey('应该没人比我玩的开了吧🤤🐒我福不黑不信你看'),

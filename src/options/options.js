@@ -59,7 +59,8 @@
     $('sensitivity-label').textContent = SENS_LABEL[s.sensitivity || 3] || '标准';
     $('imageSkinThreshold').value = String(s.imageSkinThreshold || 0.52);
     $('skin-label').textContent = Number(s.imageSkinThreshold || 0.52).toFixed(2);
-    $('minTextLength').value = String(s.minTextLength || 3);
+    $('minTextLength').value = String(s.minTextLength || 2);
+    $('dupMode').value = s.dupMode || 'safe';
     $('badgePosition').value = s.badgePosition || 'bottom-right';
 
     $('filterPorn').checked = !!s.filterPorn;
@@ -84,7 +85,8 @@
       mode: $('mode').value,
       sensitivity: Number($('sensitivity').value) || 3,
       imageSkinThreshold: Number($('imageSkinThreshold').value) || 0.52,
-      minTextLength: Math.max(1, Number($('minTextLength').value) || 3),
+      minTextLength: Math.max(1, Number($('minTextLength').value) || 2),
+      dupMode: $('dupMode').value,
       badgePosition: $('badgePosition').value,
       filterPorn: $('filterPorn').checked,
       filterSpam: $('filterSpam').checked,
@@ -110,6 +112,7 @@
       ['擦边（弱）', K.PORN_WEAK.length],
       ['垃圾广告（强）', K.SPAM_STRONG.length],
       ['推广（弱）', K.SPAM_WEAK.length],
+      ['低置信信号（需叠加）', K.SPAM_HINTS.length],
       ['灌水无效', K.JUNK_WEAK.length],
       ['联系方式/结构规则', Engine.CONTACT_PATTERNS.length],
       ['内置拦截域名', Engine.DEFAULT_BLOCKED_DOMAINS.length]
@@ -119,6 +122,7 @@
       .join('');
     $('builtin-porn').textContent = K.PORN_STRONG.concat(K.PORN_WEAK).join(' · ');
     $('builtin-spam').textContent = K.SPAM_STRONG.concat(K.SPAM_WEAK).join(' · ');
+    $('builtin-hints').textContent = K.SPAM_HINTS.join(' · ');
     $('builtin-junk').textContent = K.JUNK_WEAK.join(' · ');
   }
 

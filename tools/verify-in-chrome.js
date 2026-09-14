@@ -268,7 +268,7 @@ const OPTIONS_CHECK = `
     builtinStats: document.getElementById('builtin-stats').textContent.replace(/\\s+/g, ' ').trim(),
     testVerdict: res.textContent,
     testClass: res.className,
-    hasFields: ['whitelist','blockedDomains','customPornKeywords','sensitivity','mode','minTextLength']
+    hasFields: ['whitelist','blockedDomains','customPornKeywords','sensitivity','mode','minTextLength','dupMode']
       .every(id => !!document.getElementById(id))
   };
 })()
@@ -414,6 +414,28 @@ async function main() {
     console.log('\n=== 整页拦截 / 白名单 ===');
     console.log(JSON.stringify(guard, null, 2));
 
+    /* 6) 严格模式：整组回溯折叠（通过扩展页面写 storage 后重载测试页验证） */
+    const setStrict = `(async () => {
+      const cur = await chrome.storage.local.get('cf_settings');
+      const next = Object.assign({}, cur.cf_settings || {}, { dupMode: 'strict' });
+      await chrome.storage.local.set({ cf_settings: next });
+      return { dupMode: next.dupMode };
+    })()`;
+    await inspectExtensionPage(browserCdp, popupUrl, setStrict);
+    await pageCdp.send('Page.enable');
+    await pageCdp.send('Page.navigate', { url: testUrl });
+    await sleep(3000);
+    const strictResult = await pageCdp.evaluate(`(async () => {
+      await new Promise(r => setTimeout(r, 2000));
+      const hidden = (sel) => {
+        const el = document.querySelector(sel);
+        return el ? (el.className || '').includes('cf-hidden') : false;
+      };
+      return { dupHiddenCount: ['#dup0','#dup1','#dup2','#dup3','#dup4'].filter(hidden).length };
+    })()`);
+    console.log('\n=== 严格模式（整组回溯折叠）===');
+    console.log(JSON.stringify(strictResult, null, 2));
+
     /* ---------------- 断言 ---------------- */
     const problems = [];
     const expect = (cond, label) => { if (!cond) problems.push(label); };
@@ -426,14 +448,16 @@ async function main() {
     expect(results.normal2 === 'visible', `正常句子被误伤：${results.normal2}`);
     expect(results.normalExtraHidden === 0, `正常段落被误伤 ${results.normalExtraHidden} 处`);
     expect(results.junk !== 'visible', `灌水词应被模糊或折叠，实际：${results.junk}`);
-    expect(results.dupHiddenCount === 5,
-      `表情变体的同组刷屏内容应被全部回溯折叠（含内联表情图片那条），实际折叠 ${results.dupHiddenCount}/5 条`);
+    expect(results.dupHiddenCount === 2,
+      `保守模式（默认）只应折叠超出的 2 条，前面的正常条目必须保留，实际折叠 ${results.dupHiddenCount}/5 条`);
     expect(results.skinImg === 'blurred', `大面积肤色图片应被模糊，实际：${results.skinImg}`);
     expect(results.normalImg === 'clear', `正常风景图片被误判模糊，实际：${results.normalImg}`);
     expect(results.badgeVisible, '页面统计角标未出现');
     expect(results.guardShown === false, '正常本地测试页不应触发整页拦截');
 
     expect(popup.errors.length === 0, 'Popup 页面存在脚本错误：' + popup.errors.join(' | '));
+    expect(strictResult && strictResult.dupHiddenCount === 5,
+      `严格模式下表情变体的同组刷屏应整组回溯折叠，实际折叠 ${strictResult && strictResult.dupHiddenCount}/5 条`);
     expect(popup.result && popup.result.engine === 'object', 'Popup 未加载过滤引擎');
     expect(popup.result && popup.result.version === 'v1.0.0', 'Popup 版本号显示异常：' + (popup.result && popup.result.version));
     const expectedOn = ['filterPorn', 'filterSpam', 'filterJunk', 'filterImages', 'pageGuard'];
