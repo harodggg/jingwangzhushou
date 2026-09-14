@@ -1,0 +1,6 @@
+.tmp-chrome-profile/
+.tmp-probe/
+_metadata/
+.screenshots/
+.DS_Store
+node_modules/

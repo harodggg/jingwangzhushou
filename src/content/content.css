@@ -1,0 +1,167 @@
+/* 净网助手 · 内容脚本样式
+   所有类名以 cf- 前缀，避免污染宿主页面 */
+
+/* ---------- 被折叠的文字块 ---------- */
+.cf-hidden {
+  display: none !important;
+}
+
+/* 用户点击“显示全部”后，被折叠的内容会临时恢复并标注 */
+html.cf-revealing .cf-was-hidden {
+  outline: 2px dashed #f59e0b !important;
+  outline-offset: 2px;
+}
+
+/* ---------- 被模糊的擦边文字 ---------- */
+.cf-soft {
+  filter: blur(5px) !important;
+  transition: filter 0.15s ease;
+  cursor: pointer;
+}
+.cf-soft:hover,
+.cf-soft.cf-revealed {
+  filter: none !important;
+}
+
+/* ---------- 被模糊的疑似色情图片 ---------- */
+img.cf-blur-img,
+video.cf-blur-img,
+picture.cf-blur-img img,
+.cf-blur-img {
+  filter: blur(24px) saturate(0.4) !important;
+  transition: filter 0.2s ease;
+  cursor: pointer !important;
+}
+img.cf-blur-img:hover,
+video.cf-blur-img:hover,
+img.cf-blur-img.cf-revealed,
+video.cf-blur-img.cf-revealed,
+.cf-blur-img.cf-revealed {
+  filter: none !important;
+}
+.cf-blur-img-wrap {
+  position: relative !important;
+}
+.cf-blur-tip {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  z-index: 2147483000;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(185, 28, 28, 0.92);
+  color: #fff;
+  font: 12px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  pointer-events: none;
+  letter-spacing: 0.5px;
+}
+
+/* ---------- 页面统计角标 ---------- */
+#cf-badge {
+  position: fixed;
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.9);
+  color: #f9fafb;
+  font: 12px/1.4 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+  user-select: none;
+}
+#cf-badge:hover {
+  opacity: 1;
+}
+#cf-badge.cf-pos-bottom-right { right: 16px; bottom: 16px; }
+#cf-badge.cf-pos-bottom-left  { left: 16px;  bottom: 16px; }
+#cf-badge.cf-pos-top-right    { right: 16px; top: 16px; }
+#cf-badge.cf-pos-top-left     { left: 16px;  top: 16px; }
+#cf-badge .cf-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34d399;
+  flex: none;
+}
+#cf-badge button {
+  all: unset;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #f9fafb;
+  font: inherit;
+}
+#cf-badge button:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+#cf-badge .cf-badge-close {
+  padding: 0 6px;
+  background: transparent;
+  opacity: 0.7;
+}
+
+/* ---------- 整页风险拦截 ---------- */
+#cf-guard {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: radial-gradient(circle at 50% 30%, #1f2937, #030712 70%) !important;
+  color: #f3f4f6 !important;
+  font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif !important;
+  text-align: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+#cf-guard .cf-guard-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: #b91c1c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+}
+#cf-guard h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+#cf-guard p {
+  margin: 0;
+  max-width: 520px;
+  color: #9ca3af;
+}
+#cf-guard .cf-guard-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+#cf-guard button {
+  all: unset;
+  cursor: pointer;
+  padding: 9px 18px;
+  border-radius: 10px;
+  font: inherit;
+  background: #374151;
+  color: #f9fafb;
+}
+#cf-guard button.cf-primary {
+  background: #2563eb;
+}
+#cf-guard button:hover {
+  filter: brightness(1.15);
+}

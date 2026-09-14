@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>净网助手</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img src="../../icons/icon48.png" alt="" width="24" height="24" />
+      <div>
+        <h1>净网助手</h1>
+        <p id="scope">正在读取当前页面…</p>
+      </div>
+    </div>
+    <label class="switch" title="总开关">
+      <input type="checkbox" id="master" />
+      <span class="slider"></span>
+    </label>
+  </header>
+
+  <section class="stats">
+    <div class="stat">
+      <b id="stat-image">0</b>
+      <span>图片模糊</span>
+    </div>
+    <div class="stat">
+      <b id="stat-text">0</b>
+      <span>文案过滤</span>
+    </div>
+    <div class="stat">
+      <b id="stat-dup">0</b>
+      <span>重复/灌水</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <span>当前站点</span>
+      <button class="mini" id="site-toggle">加入白名单</button>
+    </div>
+    <p class="hint" id="site-hint">白名单站点不做任何过滤。</p>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <span>过滤强度</span>
+      <span class="value" id="sens-value">标准</span>
+    </div>
+    <input type="range" id="sensitivity" min="1" max="5" step="1" />
+    <div class="scale"><i>宽松</i><i>标准</i><i>严格</i></div>
+  </section>
+
+  <section class="card list">
+    <label class="check">
+      <input type="checkbox" id="filterPorn" />
+      <span>色情 / 擦边内容</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="filterSpam" />
+      <span>垃圾广告 / 引流诈骗</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="filterJunk" />
+      <span>无效灌水 / 重复刷屏</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="filterImages" />
+      <span>图片裸露识别（本地像素分析）</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="pageGuard" />
+      <span>高风险整页拦截</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="blockThirdPartyAds" />
+      <span>拦截常见广告 / 推广域名请求</span>
+    </label>
+  </section>
+
+  <section class="actions">
+    <button id="rescan">重新扫描本页</button>
+    <button id="reveal">显示已过滤内容</button>
+    <button id="options" class="ghost">高级设置</button>
+  </section>
+
+  <footer>
+    <span id="mode-note">全部处理均在本机完成，不上传任何数据</span>
+    <span id="version"></span>
+  </footer>
+
+  <script src="../common/filter-engine.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

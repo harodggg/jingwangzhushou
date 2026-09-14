@@ -1,0 +1,12 @@
+{
+  "name": "jingwang-helper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "净网助手 Chrome 扩展（本地内容过滤）的开发脚本集合",
+  "scripts": {
+    "test": "node --test tests/engine.test.js",
+    "verify": "node tools/verify-in-chrome.js",
+    "icons": "node tools/make-icons.js",
+    "check": "node --check src/common/filter-engine.js && node --check src/content/content.js && node --check src/background/service-worker.js && node --check src/popup/popup.js && node --check src/options/options.js"
+  }
+}

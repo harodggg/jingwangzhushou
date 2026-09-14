@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>净网助手 · 高级设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <img src="../../icons/icon48.png" alt="" width="32" height="32" />
+      <div>
+        <h1>净网助手 · 高级设置</h1>
+        <p>所有规则保存在浏览器本地，不会同步、不会上传。</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button id="export" class="ghost">导出配置</button>
+      <label class="ghost file">
+        导入配置
+        <input type="file" id="import" accept="application/json" hidden />
+      </label>
+      <button id="reset" class="danger">恢复默认</button>
+      <button id="save" class="primary">保存</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>基础</h2>
+      <div class="grid">
+        <label class="field">
+          <span>总开关</span>
+          <select id="enabled">
+            <option value="true">开启过滤</option>
+            <option value="false">暂停过滤</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>过滤方式</span>
+          <select id="mode">
+            <option value="hide">标准：强命中折叠隐藏，弱命中模糊（推荐）</option>
+            <option value="blur">温和：全部仅模糊，不改变页面结构</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>过滤强度 <b id="sensitivity-label">标准</b></span>
+          <input type="range" id="sensitivity" min="1" max="5" step="1" />
+        </label>
+        <label class="field">
+          <span>图片肤色阈值 <b id="skin-label">0.52</b></span>
+          <input type="range" id="imageSkinThreshold" min="0.3" max="0.85" step="0.01" />
+        </label>
+        <label class="field">
+          <span>最短过滤文本长度</span>
+          <input type="number" id="minTextLength" min="1" max="30" step="1" />
+        </label>
+        <label class="field">
+          <span>角标位置</span>
+          <select id="badgePosition">
+            <option value="bottom-right">右下角</option>
+            <option value="bottom-left">左下角</option>
+            <option value="top-right">右上角</option>
+            <option value="top-left">左上角</option>
+          </select>
+        </label>
+      </div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="filterPorn" /><span>色情 / 擦边内容</span></label>
+        <label class="check"><input type="checkbox" id="filterSpam" /><span>垃圾广告 / 引流诈骗</span></label>
+        <label class="check"><input type="checkbox" id="filterJunk" /><span>无效灌水 / 重复刷屏</span></label>
+        <label class="check"><input type="checkbox" id="filterImages" /><span>图片裸露识别</span></label>
+        <label class="check"><input type="checkbox" id="imageScan" /><span>下载并分析图片像素（可关闭以省流量）</span></label>
+        <label class="check"><input type="checkbox" id="pageGuard" /><span>高风险整页拦截</span></label>
+        <label class="check"><input type="checkbox" id="showBadge" /><span>显示页面统计角标</span></label>
+        <label class="check"><input type="checkbox" id="blockThirdPartyAds" /><span>拦截常见广告 / 推广域名请求</span></label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>站点管理</h2>
+      <div class="columns">
+        <label class="field">
+          <span>白名单（每行一个域名，支持子域）</span>
+          <textarea id="whitelist" rows="7" placeholder="example.com&#10;mail.google.com"></textarea>
+        </label>
+        <label class="field">
+          <span>额外拦截域名（整页拦截）</span>
+          <textarea id="blockedDomains" rows="7" placeholder="spam-site.com"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>自定义词库</h2>
+      <p class="note">每行一个词或短语。中文无需转义；英文自动按单词边界匹配（不区分大小写）。</p>
+      <div class="columns">
+        <label class="field">
+          <span>追加色情关键词</span>
+          <textarea id="customPornKeywords" rows="7" placeholder="每行一个"></textarea>
+        </label>
+        <label class="field">
+          <span>追加垃圾广告关键词</span>
+          <textarea id="customSpamKeywords" rows="7" placeholder="每行一个"></textarea>
+        </label>
+      </div>
+      <label class="field">
+        <span>白名单词（命中后大幅降分，用于纠正误伤）</span>
+        <textarea id="customAllowKeywords" rows="4" placeholder="例如：性教育&#10;乳腺癌&#10;色情危害"></textarea>
+      </label>
+    </section>
+
+    <section class="panel">
+      <h2>规则测试器</h2>
+      <p class="note">粘贴一段文字，查看当前规则会给出什么判定（不会访问网络）。</p>
+      <textarea id="test-input" rows="4" placeholder="例如：加微信 abc123 免费领取内部资源，日赚千元！"></textarea>
+      <div class="test-actions">
+        <button id="run-test" class="primary">测试这段文本</button>
+        <button id="test-sample" class="ghost">填入示例</button>
+      </div>
+      <div id="test-result" class="result">尚未测试。</div>
+    </section>
+
+    <section class="panel">
+      <h2>内置词库概览</h2>
+      <div id="builtin-stats" class="builtin"></div>
+      <details>
+        <summary>查看内置色情关键词</summary>
+        <p id="builtin-porn" class="words"></p>
+      </details>
+      <details>
+        <summary>查看内置垃圾广告关键词</summary>
+        <p id="builtin-spam" class="words"></p>
+      </details>
+      <details>
+        <summary>查看内置灌水 / 无效信息关键词</summary>
+        <p id="builtin-junk" class="words"></p>
+      </details>
+    </section>
+
+    <section class="panel">
+      <h2>隐私说明</h2>
+      <ul class="privacy">
+        <li>文本判断：完全在页面本地完成，不发送任何页面内容。</li>
+        <li>图片判断：优先使用页面内画布读取像素；遇到跨域图片时，由扩展后台仅下载该图片到内存做肤色统计，结果缓存于内存，不落盘、不上传第三方。</li>
+        <li>不收集浏览记录、不统计用户 ID、不包含任何远程代码。</li>
+      </ul>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="../common/filter-engine.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
