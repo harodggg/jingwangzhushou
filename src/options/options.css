@@ -161,3 +161,15 @@ summary { cursor: pointer; font-size: 13px; }
   transition: 0.25s;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.row-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.row-inline .note { margin: 0; }

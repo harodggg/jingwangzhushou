@@ -26,6 +26,7 @@
     blockThirdPartyAds: $('blockThirdPartyAds'),
     rescan: $('rescan'),
     reveal: $('reveal'),
+    report: $('report'),
     options: $('options'),
     version: $('version')
   };
@@ -192,6 +193,15 @@
       chrome.tabs.sendMessage(tab.id, { type: 'CF_REVEAL_ALL' }, () => {
         void chrome.runtime.lastError;
         renderStats({ image: 0, text: 0, duplicate: 0 });
+      });
+    });
+
+    els.report.addEventListener('click', () => {
+      if (!tab || !tab.id) return;
+      chrome.tabs.sendMessage(tab.id, { type: 'CF_OPEN_PANEL' }, (resp) => {
+        void chrome.runtime.lastError;
+        if (!resp) els.siteHint.textContent = '本页无法注入脚本，误报清单不可用。';
+        window.close();
       });
     });
 

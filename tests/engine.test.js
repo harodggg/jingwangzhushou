@@ -167,6 +167,34 @@ test('人脸大小的少量肤色不至于触发', () => {
   assert.equal(Engine.shouldBlurImage(analysis, BASE), false);
 });
 
+test('人像特写不应被误判为裸露（五官暗部特征）', () => {
+  // 满幅肤色 + 头发 + 双眼 + 嘴 —— 正常的人像特写
+  const data = makeImage(100, 100, (x, y) => {
+    if (y < 18) return [30, 25, 25];                                    // 头发
+    if ((x - 38) ** 2 + (y - 42) ** 2 < 25) return [35, 30, 30];        // 左眼
+    if ((x - 62) ** 2 + (y - 42) ** 2 < 25) return [35, 30, 30];        // 右眼
+    if (Math.abs(x - 50) < 10 && Math.abs(y - 70) < 4) return [120, 60, 60]; // 嘴
+    return [210, 160, 135];
+  });
+  const analysis = Engine.skinScore(data, 100, 100);
+  assert.equal(analysis.faceLike, true, '应识别出人像特征');
+  assert.ok(analysis.skinRatio > 0.8, '肤色占比确实很高');
+  assert.equal(Engine.shouldBlurImage(analysis, BASE), false, '人像特写不应被模糊');
+});
+
+test('纯色占位图 / 背景图不应被误判', () => {
+  const analysis = Engine.skinScore(makeImage(100, 100, () => [214, 178, 148]), 100, 100);
+  assert.ok(analysis.flatness > 0.9, '应识别为纯色图');
+  assert.equal(analysis.score, 0);
+  assert.equal(Engine.shouldBlurImage(analysis, BASE), false);
+});
+
+test('大面积平滑肤色仍然会被判定为可疑（不能因为降误伤而失效）', () => {
+  const analysis = Engine.skinScore(makeImage(100, 100, (x, y) => [205 + ((x + y) % 7), 152, 128]), 100, 100);
+  assert.equal(analysis.faceLike, false);
+  assert.equal(Engine.shouldBlurImage(analysis, BASE), true);
+});
+
 /* ---------------- 擦边引流僵尸号（来自真实截图回归） ---------------- */
 test('截图中的擦边引流文案会被拦截', () => {
   const posts = [

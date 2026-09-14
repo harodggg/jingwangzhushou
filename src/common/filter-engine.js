@@ -45,7 +45,8 @@
     blockedDomains: [],       // 用户自定义拦截域名
     customPornKeywords: [],
     customSpamKeywords: [],
-    customAllowKeywords: [],  // 白名单词：命中则大幅降分
+    customAllowKeywords: [],  // 白名单词：命中则整个文本块放行
+    imageAllowlist: [],       // 用户「误报」过的图片（按 src 记录），永不再模糊
     maxBlocksPerPage: 1500
   };
 
@@ -385,22 +386,40 @@
 
   /**
    * 分析 RGBA 像素，返回疑似裸露程度 0~1
-   * 思路：统计肤色像素占比 + 肤色区域的平滑度（真人皮肤通常平滑且面积大）
-   * 这是纯启发式判断，只用于“先模糊、可点开”，不会删除任何内容。
+   *
+   * 判据（纯启发式，只用于“先模糊、可点开”，绝不删除内容）：
+   *   1. 肤色占比        —— 大面积肤色才可疑
+   *   2. 皮肤平滑度      —— 真人皮肤区域越平滑越像裸露
+   *   3. 画面彩色度      —— 越“彩色”越像正常照片
+   *   4. 人脸特征密度    —— 人像有眼睛/眉毛/嘴/头发等暗部；大面积裸露皮肤几乎没有，
+   *                        因此暗部集中的图更像人像特写，需要大幅降权
+   *   5. 纯色占比        —— 纯色背景图/占位图直接排除
    * @param {Uint8ClampedArray|Uint8Array} data
    * @param {number} width
    * @param {number} height
    */
   function skinScore(data, width, height) {
-    if (!data || !width || !height) return { score: 0, skinRatio: 0, smoothness: 0, samples: 0 };
+    const empty = { score: 0, skinRatio: 0, smoothness: 0, samples: 0, flatness: 0, darkRatio: 0, faceLike: false };
+    if (!data || !width || !height) return empty;
+
     const total = width * height;
     const step = Math.max(1, Math.floor(Math.sqrt(total / 6000))); // 约 6000 个采样点
+    const cols = Math.ceil(width / step);
+    const rows = Math.ceil(height / step);
+    const mask = new Uint8Array(cols * rows);
+    const lums = new Uint8Array(cols * rows);
+    // 精确颜色计数：只有“整图几乎是同一个颜色”才算纯色图。
+    // 注意不能用粗量化（如每通道 4bit）——平滑的肌肤照片也会挤进同一个粗桶，
+    // 那样会把正常照片误判成占位图。
+    const colorCounts = new Map();
+
     let samples = 0, skinCount = 0;
-    let sumR = 0, sumR2 = 0, sumG = 0, sumB = 0;
+    let sumR = 0, sumR2 = 0;
     let colorful = 0;
 
-    for (let y = 0; y < height; y += step) {
-      for (let x = 0; x < width; x += step) {
+    for (let gy = 0, y = 0; gy < rows; gy++, y += step) {
+      for (let gx = 0, x = 0; gx < cols; gx++, x += step) {
+        const idx = gy * cols + gx;
         const i = (y * width + x) * 4;
         const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
         samples++;
@@ -409,6 +428,9 @@
         const max = Math.max(r, g, b);
         const min = Math.min(r, g, b);
         if (max - min > 12) colorful++;
+        lums[idx] = (r * 299 + g * 587 + b * 114) / 1000;
+        const packed = (r << 16) | (g << 8) | b;
+        colorCounts.set(packed, (colorCounts.get(packed) || 0) + 1);
 
         // 经典肤色判定（多条件并集，降低误判）
         const ruleA = r > 95 && g > 40 && b > 20 && (max - min) > 15 && Math.abs(r - g) > 15 && r > g && r > b;
@@ -417,33 +439,60 @@
           (r - b) > 25 && (r - b) < 130 && (r - g) > 8 && (r - g) < 90;
         const sum = r + g + b;
         const nr = r / sum, ng = g / sum;
-        const ruleD = nr > 0.36 && nr < 0.52 && ng > 0.28 && ng < 0.40 && ng < nr && nr > ng;
 
-        if (ruleA || ruleB || ruleC || ruleD) {
+        if (ruleA || ruleB || ruleC || (nr > 0.36 && nr < 0.52 && ng > 0.28 && ng < 0.40 && ng < nr)) {
+          mask[idx] = 1;
           skinCount++;
-          sumR += r; sumR2 += r * r; sumG += g; sumB += b;
+          sumR += r; sumR2 += r * r;
         }
       }
     }
 
     const skinRatio = samples ? skinCount / samples : 0;
     if (skinCount < 20 || skinRatio < 0.12) {
-      return { score: 0, skinRatio, smoothness: 0, samples };
+      return { score: 0, skinRatio, smoothness: 0, samples, flatness: 0, darkRatio: 0, faceLike: false };
     }
+
+    // 纯色占比：整图几乎完全同一个颜色 -> 纯色背景 / 占位图，不是照片
+    let maxExact = 0;
+    for (const count of colorCounts.values()) if (count > maxExact) maxExact = count;
+    const flatness = samples ? maxExact / samples : 0;
+
+    // 肤色包围盒内的暗部密度：眼睛/眉毛/嘴/头发等
+    let minGX = cols, maxGX = -1, minGY = rows, maxGY = -1;
+    for (let gy = 0; gy < rows; gy++) {
+      for (let gx = 0; gx < cols; gx++) {
+        if (!mask[gy * cols + gx]) continue;
+        if (gx < minGX) minGX = gx;
+        if (gx > maxGX) maxGX = gx;
+        if (gy < minGY) minGY = gy;
+        if (gy > maxGY) maxGY = gy;
+      }
+    }
+    let bboxCells = 0, darkCells = 0;
+    for (let gy = minGY; gy <= maxGY; gy++) {
+      for (let gx = minGX; gx <= maxGX; gx++) {
+        bboxCells++;
+        if (lums[gy * cols + gx] < 70) darkCells++;
+      }
+    }
+    const darkRatio = bboxCells ? darkCells / bboxCells : 0;
+    // 人像特写：肤色区域内夹着明显的暗部（五官、头发）
+    const faceLike = darkRatio > 0.035;
 
     const meanR = sumR / skinCount;
     const variance = Math.max(0, sumR2 / skinCount - meanR * meanR);
     const std = Math.sqrt(variance);
-    // 皮肤区域越平滑（std 小）越像是大面积裸露皮肤
     const smoothness = clamp(1 - std / 70, 0, 1);
     const colorfulness = samples ? colorful / samples : 0;
 
-    // 面积为主，平滑度加权，画面越“彩色”越可能是正常照片而非大块肤色
     let score = skinRatio * (0.62 + 0.38 * smoothness);
     score *= (1 - 0.35 * colorfulness);
+    if (faceLike) score *= 0.45;   // 有人脸特征，大幅降权
+    if (flatness > 0.92) score = 0; // 几乎完全纯色（占位图/背景块），直接排除
     score = clamp(score, 0, 1);
 
-    return { score, skinRatio, smoothness, colorfulness, samples };
+    return { score, skinRatio, smoothness, colorfulness, samples, flatness, darkRatio, faceLike };
   }
 
   function shouldBlurImage(analysis, settings) {

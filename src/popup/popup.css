@@ -161,6 +161,13 @@ input[type="range"] {
   cursor: pointer;
 }
 .actions button:hover { filter: brightness(1.08); }
+.actions .warn {
+  background: transparent;
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  grid-column: span 2;
+}
+.actions .warn:hover { background: rgba(245, 158, 11, 0.1); }
 .actions .ghost {
   background: transparent;
   color: var(--text);

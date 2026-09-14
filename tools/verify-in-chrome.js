@@ -60,6 +60,15 @@ img{width:300px;height:300px;display:block;margin:10px 0}
 <canvas id="normalcanvas" width="300" height="300" style="display:none"></canvas>
 <img id="normalimg" alt="test2" />
 
+<h2>人像特写（应当放行，不能误判为裸露）</h2>
+<img id="faceimg" alt="portrait" />
+
+<h2>纯色占位图（应当放行）</h2>
+<img id="flatimg" alt="placeholder" />
+
+<h2 id="longhead">网络环境专项整治行动取得阶段性成效，有关部门表示将持续推进治理工作，重点打击传播淫秽色情信息的违法违规行为，同时加强未成年人保护力度，压实平台主体责任，完善长效监管机制，并畅通举报渠道，形成社会共治格局。</h2>
+<h2 id="shorthead">色情视频免费领取</h2>
+
 ${normalBlocks}
 <script>
   // 生成大面积肤色图片
@@ -78,13 +87,24 @@ ${normalBlocks}
     ctx.putImageData(img, 0, 0);
     document.getElementById(id).src = c.toDataURL('image/png');
   }
-  paint('skinimg', (x, y) => [205 + ((x + y) % 6), 152, 128]);
+  // 带纹理的大面积肤色照片（模拟真实照片的噪声，而不是纯色块）
+  paint('skinimg', (x, y) => [200 + ((x * 7 + y * 13) % 40), 145 + ((x * 3) % 25), 125 + ((y * 5) % 22)]);
   paint('normalimg', (x, y) => {
     const band = Math.floor(y / 60) % 3;
     if (band === 0) return [80, 150, 230];
     if (band === 1) return [70, 165, 80];
     return [225, 230, 240];
   });
+  // 人像特写：满幅肤色 + 头发 + 双眼 + 嘴
+  paint('faceimg', (x, y) => {
+    if (y < 55) return [35, 28, 26];
+    if ((x - 115) ** 2 + (y - 150) ** 2 < 220) return [40, 35, 35];
+    if ((x - 185) ** 2 + (y - 150) ** 2 < 220) return [40, 35, 35];
+    if (Math.abs(x - 150) < 34 && Math.abs(y - 215) < 12) return [125, 60, 60];
+    return [212, 166, 140];
+  });
+  // 纯色占位图
+  paint('flatimg', () => [214, 178, 148]);
 </script>
 </body></html>`;
 }
@@ -200,8 +220,13 @@ const CHECK_SCRIPT = `
     dupHiddenCount: dupHidden,
     skinImg: blurred('#skinimg') ? 'blurred' : 'clear',
     normalImg: blurred('#normalimg') ? 'blurred' : 'clear',
+    faceImg: blurred('#faceimg') ? 'blurred' : 'clear',
+    flatImg: blurred('#flatimg') ? 'blurred' : 'clear',
+    longHead: hidden('#longhead') ? 'hidden' : (soft('#longhead') ? 'soft' : 'visible'),
+    shortHead: hidden('#shorthead') ? 'hidden' : (soft('#shorthead') ? 'soft' : 'visible'),
     badgeVisible: !!badge,
     badgeText: badge ? badge.textContent.trim() : '',
+    hasReportButton: !!(badge && badge.querySelector('.cf-badge-report')),
     guardShown: !!document.getElementById('cf-guard')
   };
 })()
@@ -268,7 +293,7 @@ const OPTIONS_CHECK = `
     builtinStats: document.getElementById('builtin-stats').textContent.replace(/\\s+/g, ' ').trim(),
     testVerdict: res.textContent,
     testClass: res.className,
-    hasFields: ['whitelist','blockedDomains','customPornKeywords','sensitivity','mode','minTextLength','dupMode']
+    hasFields: ['whitelist','blockedDomains','customPornKeywords','sensitivity','mode','minTextLength','dupMode','clear-reports']
       .every(id => !!document.getElementById(id))
   };
 })()
@@ -414,6 +439,39 @@ async function main() {
     console.log('\n=== 整页拦截 / 白名单 ===');
     console.log(JSON.stringify(guard, null, 2));
 
+    /* 6) 误报流程：点角标「误报」-> 清单里点「误报，不再过滤」-> 刷新后不再过滤 */
+    const reportFlow = await pageCdp.evaluate(`(async () => {
+      const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+      const badgeBtn = document.querySelector('#cf-badge .cf-badge-report');
+      if (!badgeBtn) return { error: '角标上没有误报按钮' };
+      badgeBtn.click();
+      await sleep(300);
+      const panel = document.getElementById('cf-panel');
+      if (!panel) return { error: '误报清单未打开' };
+      const itemCount = panel.querySelectorAll('.cf-panel-item').length;
+      const items = Array.from(panel.querySelectorAll('.cf-panel-item'));
+      const target = items.find(it => it.querySelector('.cf-panel-text').textContent.includes('免费领取'));
+      if (!target) return { error: '清单里找不到被误伤的那条', itemCount };
+      target.querySelector('.cf-panel-report').click();
+      await sleep(500);
+      return {
+        itemCount,
+        spamClassAfterReport: document.getElementById('spam1').className,
+        panelStillOpen: !!document.getElementById('cf-panel')
+      };
+    })()`);
+
+    await pageCdp.send('Page.enable');
+    await pageCdp.send('Page.navigate', { url: testUrl });
+    await sleep(3000);
+    const afterReportReload = await pageCdp.evaluate(`(async () => {
+      await new Promise(r => setTimeout(r, 1800));
+      const el = document.getElementById('spam1');
+      return { spamClass: el ? el.className : 'MISSING', stillFiltered: el ? (el.className || '').includes('cf-hidden') : false };
+    })()`);
+    console.log('\n=== 误报流程 ===');
+    console.log(JSON.stringify({ reportFlow, afterReportReload }, null, 2));
+
     /* 6) 严格模式：整组回溯折叠（通过扩展页面写 storage 后重载测试页验证） */
     const setStrict = `(async () => {
       const cur = await chrome.storage.local.get('cf_settings');
@@ -452,10 +510,21 @@ async function main() {
       `保守模式（默认）只应折叠超出的 2 条，前面的正常条目必须保留，实际折叠 ${results.dupHiddenCount}/5 条`);
     expect(results.skinImg === 'blurred', `大面积肤色图片应被模糊，实际：${results.skinImg}`);
     expect(results.normalImg === 'clear', `正常风景图片被误判模糊，实际：${results.normalImg}`);
+    expect(results.faceImg === 'clear', `人像特写被误判模糊（误伤），实际：${results.faceImg}`);
+    expect(results.flatImg === 'clear', `纯色占位图被误判模糊（误伤），实际：${results.flatImg}`);
+    expect(results.longHead !== 'hidden', `长标题/正文被整块折叠（误伤），实际：${results.longHead}`);
+    expect(results.shortHead !== 'hidden', `标题被整块折叠（误伤），实际：${results.shortHead}`);
     expect(results.badgeVisible, '页面统计角标未出现');
     expect(results.guardShown === false, '正常本地测试页不应触发整页拦截');
 
     expect(popup.errors.length === 0, 'Popup 页面存在脚本错误：' + popup.errors.join(' | '));
+    expect(results.hasReportButton, '角标上缺少「误报」入口');
+    expect(!reportFlow.error, '误报流程失败：' + (reportFlow.error || ''));
+    expect(reportFlow.itemCount > 0, '误报清单应列出被过滤的条目');
+    expect(!(reportFlow.spamClassAfterReport || '').includes('cf-hidden'),
+      '点「误报」后该条目应立即恢复显示，实际：' + reportFlow.spamClassAfterReport);
+    expect(afterReportReload.stillFiltered === false,
+      '误报后刷新页面仍被过滤，白名单未持久化：' + JSON.stringify(afterReportReload));
     expect(strictResult && strictResult.dupHiddenCount === 5,
       `严格模式下表情变体的同组刷屏应整组回溯折叠，实际折叠 ${strictResult && strictResult.dupHiddenCount}/5 条`);
     expect(popup.result && popup.result.engine === 'object', 'Popup 未加载过滤引擎');

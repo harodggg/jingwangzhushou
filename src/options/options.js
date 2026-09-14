@@ -77,6 +77,17 @@
     $('customPornKeywords').value = arrayToLines(s.customPornKeywords);
     $('customSpamKeywords').value = arrayToLines(s.customSpamKeywords);
     $('customAllowKeywords').value = arrayToLines(s.customAllowKeywords);
+    renderReportSummary(s);
+  }
+
+  function renderReportSummary(s) {
+    const keywords = (s.customAllowKeywords || []).length;
+    const images = (s.imageAllowlist || []).length;
+    const el = $('report-summary');
+    if (!el) return;
+    el.textContent = keywords + images === 0
+      ? '误报记录：暂无（在网页右下角角标点「误报」即可纠正误伤）'
+      : '误报记录：白名单词 ' + keywords + ' 条、图片 ' + images + ' 张';
   }
 
   function collect() {
@@ -156,6 +167,13 @@
     });
     $('imageSkinThreshold').addEventListener('input', () => {
       $('skin-label').textContent = Number($('imageSkinThreshold').value).toFixed(2);
+    });
+
+    $('clear-reports').addEventListener('click', async () => {
+      if (!confirm('清空所有误报记录？清空后这些内容会重新参与过滤。')) return;
+      await persist({ customAllowKeywords: [], imageAllowlist: [] }, true);
+      fill(settings);
+      toast('已清空误报记录');
     });
 
     $('save').addEventListener('click', async () => {
