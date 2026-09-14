@@ -21,7 +21,8 @@
   const MAX_IMAGE_BUDGET = 120;    // 单个页面分析的图片数量上限
   const IMAGE_MIN_SIZE = 110;      // 小于该边长的图片视为图标/头像，不分析
   const DUP_MIN_LEN = 8;           // 参与“重复刷屏”判定的最短文本
-  const DUP_THRESHOLD = 4;         // 相同文本出现次数阈值
+  const DUP_THRESHOLD = 3;         // 相同文本出现次数阈值（僵尸号刷屏通常 3 条起）
+  const DUP_MAX_GROUPS = 3000;     // 去重分组上限，防止无限滚动页面内存膨胀
 
   const state = {
     settings: null,
@@ -279,18 +280,49 @@
     if (state.settings.filterJunk) detectDuplicate(el, raw);
   }
 
-  /** 重复刷屏 / 无效信息检测 */
+  /**
+   * 重复刷屏 / 僵尸号群发检测。
+   * 关键点：
+   *  1. 指纹用 Engine.dupKey —— 表情符号被剥离，所以“同一句话只换表情”仍算同一条；
+   *  2. 达到阈值后**回溯隐藏同组已出现的所有条目**，否则最先刷出来的几条会漏掉；
+   *  3. 内联表情在 Twitter/X 上是 <img>，因此不能因为块里有 img 就跳过；
+   *     只有真正的内容图（≥100px）或视频才跳过。
+   */
   function detectDuplicate(el, raw) {
     if (raw.length < DUP_MIN_LEN || raw.length > 160) return;
-    if (el.querySelector('a, img, video')) return;
+    if (hasHeavyMedia(el)) return;
     if (el.closest('nav, header, footer, aside')) return;
-    const key = Engine.compactText(raw);
+    const key = Engine.dupKey(raw);
     if (!key || key.length < DUP_MIN_LEN) return;
-    const hit = (state.seenText.get(key) || 0) + 1;
-    state.seenText.set(key, hit);
-    if (hit >= DUP_THRESHOLD) {
-      hideBlock(el, '重复刷屏内容', 'junk');
+
+    let group = state.seenText.get(key);
+    if (!group) {
+      if (state.seenText.size >= DUP_MAX_GROUPS) return;
+      group = { count: 0, elements: [] };
+      state.seenText.set(key, group);
     }
+    group.count++;
+    group.elements.push(el);
+
+    if (group.count < DUP_THRESHOLD) return;
+    for (const target of group.elements) {
+      if (!target.isConnected) continue;
+      if (state.userRevealed.has(target)) continue;
+      if (target.classList.contains('cf-hidden')) continue;
+      hideBlock(target, '重复刷屏内容（同组 ' + group.count + ' 条）', 'junk');
+    }
+  }
+
+  /** 块内是否包含真正的内容媒体（头像、表情等小图不算） */
+  function hasHeavyMedia(el) {
+    if (el.querySelector('video, iframe')) return true;
+    const images = el.querySelectorAll('img');
+    for (const img of images) {
+      const w = img.naturalWidth || img.width || 0;
+      const h = img.naturalHeight || img.height || 0;
+      if (w >= 100 && h >= 100) return true;
+    }
+    return false;
   }
 
   function hideBlock(el, reason, category) {

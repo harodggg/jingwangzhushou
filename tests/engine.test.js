@@ -167,6 +167,40 @@ test('人脸大小的少量肤色不至于触发', () => {
   assert.equal(Engine.shouldBlurImage(analysis, BASE), false);
 });
 
+/* ---------------- 擦边引流僵尸号（来自真实截图回归） ---------------- */
+test('截图中的擦边引流文案会被拦截', () => {
+  const posts = [
+    '应该没人比我玩的开了吧🤤🐒我福不黑不信你看',
+    '应该没人比我玩的开了吧🤤🐵我福不黑不信你看',
+    '比我好看的没我骚🤤🐵比我骚的没我好看'
+  ];
+  for (const post of posts) {
+    assert.equal(scan(post).action, 'hide', '应拦截：' + post);
+  }
+});
+
+test('不得因为“骚”“放得开”等字误伤正常表达', () => {
+  const safe = [
+    '遇到性骚扰应该及时报警并保留证据',
+    '最近在读《离骚》，也关注到城市骚乱和骚动的新闻',
+    '他性格比较放得开，玩得开心最重要',
+    '员工福利和薪资待遇是本次会议的重点'
+  ];
+  for (const text of safe) {
+    assert.equal(scan(text).action, 'pass', '不应拦截：' + text);
+  }
+});
+
+test('重复指纹忽略表情符号，但保留正文差异', () => {
+  assert.equal(
+    Engine.dupKey('应该没人比我玩的开了吧🤤🐒我福不黑不信你看'),
+    Engine.dupKey('应该没人比我玩的开了吧🤤🐵我福不黑不信你看'),
+    '只换表情的同一句话应视作同一条'
+  );
+  assert.notEqual(Engine.dupKey('今天天气不错'), Engine.dupKey('明天天气不错'));
+  assert.notEqual(Engine.dupKey('这是一条正常评论'), Engine.dupKey('这是另一条正常评论'));
+});
+
 /* ---------------- 工具函数 ---------------- */
 test('文本归一化处理全角、零宽字符与大小写', () => {
   assert.equal(Engine.normalizeText('ＡＢＣ　１２３'), 'abc 123');

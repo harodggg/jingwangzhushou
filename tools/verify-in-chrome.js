@@ -18,10 +18,15 @@ const DEBUG_PORT = Number(process.env.DEBUG_PORT || 9333);
 
 /* ---------------- 测试页面 ---------------- */
 const DUPLICATE_TEXT = '这是一条重复的评论内容';
+// 僵尸号刷屏特征：同一句话只换表情（外加一个内联小图，模拟 Twitter/X 的表情渲染）
+const EMOJI_VARIANTS = ['🤤🐒', '🤤🐵', '🤤🐒', '🐵🤤', '🤤🐒'];
+const INLINE_EMOJI_IMG = '<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" width="16" height="16" alt="🤤">';
 
 function pageHtml() {
-  const dupBlocks = Array.from({ length: 5 }, (_, i) =>
-    `<div class="dup-item" id="dup${i}">${DUPLICATE_TEXT}</div>`).join('\n');
+  const dupBlocks = Array.from({ length: 5 }, (_, i) => {
+    const inline = i === 4 ? INLINE_EMOJI_IMG : '';
+    return `<div class="dup-item" id="dup${i}">${DUPLICATE_TEXT}${EMOJI_VARIANTS[i]}${inline}</div>`;
+  }).join('\n');
 
   const normalBlocks = Array.from({ length: 12 }, (_, i) =>
     `<p id="normal-extra-${i}">第 ${i} 段正常正文，用于确认页面其余内容不会被误伤。阅读使人明智。</p>`).join('\n');
@@ -421,7 +426,8 @@ async function main() {
     expect(results.normal2 === 'visible', `正常句子被误伤：${results.normal2}`);
     expect(results.normalExtraHidden === 0, `正常段落被误伤 ${results.normalExtraHidden} 处`);
     expect(results.junk !== 'visible', `灌水词应被模糊或折叠，实际：${results.junk}`);
-    expect(results.dupHiddenCount >= 2, `重复灌水内容应被折叠，实际折叠 ${results.dupHiddenCount} 条`);
+    expect(results.dupHiddenCount === 5,
+      `表情变体的同组刷屏内容应被全部回溯折叠（含内联表情图片那条），实际折叠 ${results.dupHiddenCount}/5 条`);
     expect(results.skinImg === 'blurred', `大面积肤色图片应被模糊，实际：${results.skinImg}`);
     expect(results.normalImg === 'clear', `正常风景图片被误判模糊，实际：${results.normalImg}`);
     expect(results.badgeVisible, '页面统计角标未出现');

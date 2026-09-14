@@ -75,6 +75,9 @@
     '涩涩', '瑟瑟', '色色', '美女裸', '大尺度', '无删减', '未删减', '福利视频', '深夜福利', '福利群',
     '激情视频', '激情聊天', '视频聊天室', '一对一视频', '同城交友', '同城约', '附近的人', '附近约',
     '情趣', '性感女主播', '美女主播', '私密直播', '成人app', '成人版', '解锁姿势', '老司机资源',
+    // 擦边引流僵尸号常用话术（注意：不用裸的“骚”，否则会误伤“骚扰/骚乱/离骚”）
+    '发骚', '骚货', '骚逼', '骚b', '骚女', '骚照', '骚视频', '我骚', '比我骚', '没我骚',
+    '玩的开了吧',
     '磁力链接', '种子下载', '无圣光', '无修版', '抢版', '里世界',
     'nsfw', 'adult video', 'adult chat', 'sex chat', 'sexcam', 'sexting', 'sexy girls',
     'hot girls', 'cam2cam', 'hookup', 'sugar baby', 'sugar daddy', 'only fan', 'leaked nudes'
@@ -90,6 +93,8 @@
     '内部渠道', '一手货源', '厂家直销', '招代理', '代理加盟', '微商', '博彩', '赌场', '真人荷官',
     '时时彩', '六合彩', '北京赛车', 'pk10', '澳门银河', '太阳城', '威尼斯人', '在线赌', '棋牌室',
     '薅羊毛', '羊毛党', '返利机器人', '优惠券群', '0元购', '免费送', '免费试用', '点赞返现',
+    // 引流黑话（“福不黑”= 福利不黑的谐音变体，正常文本不会出现）
+    '福不黑', '福利不黑', '资源不黑',
     '推荐股票', '股票群', '带单', '喊单', '区块链搬砖', '虚拟币带单', '炒币群', '挖矿机',
     'viagra', 'cialis', 'levitra', 'casino bonus', 'online casino', 'sports betting', 'betting site',
     'buy followers', 'buy cheap meds', 'work from home and earn', 'make money fast', 'double your bitcoin',
@@ -101,6 +106,7 @@
     '广告', '推广', '赞助商', '商务合作', '推广位', '软文', '带货', '直播间', '秒杀', '清仓', '甩卖',
     '限时特价', '内部价', '扫码', '下载app', '打开app', '立即下载', '点击下载', '点击查看详情',
     '更多精彩内容', '更多福利', '戳这里', '点这里', '看这里', '往下看', '评论区见',
+    '主页有惊喜', '主页有福利', '看我主页', '进我主页',
     'sponsored', 'promoted', 'advertisement', 'affiliate link', 'download our app', 'install now'
   ];
 
@@ -172,6 +178,14 @@
   /** 进一步压缩：去掉所有分隔符号，用于识别 “微 信 : abc_123” 这类混淆 */
   function compactText(input) {
     return normalizeText(input).replace(/[\s._\-*~^·:：,，。.、|/\\()[\]{}<>"'`+＋@#!！?？]/g, '');
+  }
+
+  /**
+   * 重复内容指纹：在压缩文本基础上再去掉表情符号。
+   * 僵尸号刷屏常用同一句话只换表情（🤤🐒 → 🤤🐵），必须视作同一条。
+   */
+  function dupKey(input) {
+    return compactText(input).replace(/[\p{Extended_Pictographic}\uFE0F\u20E3]/gu, '');
   }
 
   const CN_CHAR = /[\u4e00-\u9fff]/;
@@ -439,6 +453,7 @@
     CONTACT_PATTERNS,
     normalizeText,
     compactText,
+    dupKey,
     thresholdsFor,
     clamp,
     createScanner,
